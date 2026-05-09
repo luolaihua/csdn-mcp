@@ -338,11 +338,23 @@ async def csdn_publish(
             await page.keyboard.press("Backspace")
 
         if draft:
-            await asyncio.sleep(3)
-            return json.dumps({
-                "success": True, "title": title,
-                "message": f"✅ 「{title}」内容已注入编辑器！请到 CSDN 后台「内容管理→草稿箱」查看。"
-            }, ensure_ascii=False)
+            try:
+                save_btn = await page.wait_for_selector('button.button-save', timeout=5000)
+                await save_btn.click()
+                await asyncio.sleep(4)
+                m = None
+                import re as _re
+                try:
+                    m = _re.search(r'articleId=(\d+)', page.url)
+                except: pass
+                # 也检查 URL 历史
+                aid = m.group(1) if m else None
+                msg = f"✅ 「{title}」已保存到草稿箱"
+                if aid: msg += f"\n🔗 https://editor.csdn.net/md/?articleId={aid}"
+            except:
+                await asyncio.sleep(3)
+                msg = f"✅ 「{title}」内容已注入编辑器！请手动点击保存或到 CSDN 后台查看。"
+            return json.dumps({"success": True, "title": title, "message": msg}, ensure_ascii=False)
 
         # ====== 发布模式 ======
         await asyncio.sleep(2)
