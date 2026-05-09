@@ -314,8 +314,7 @@ async def csdn_publish(
             // 新版 contenteditable 编辑器（insertHTML 保留换行）
             var pre = document.querySelector('pre.editor__inner');
             if(pre && pre.isContentEditable){{
-                var html = `{escaped}`.replace(/\\n\\n/g, '</p><p>').replace(/\\n/g, '<br>');
-                html = '<p>' + html + '</p>';
+                var html = `{escaped}`.replace(/\\n/g, '<br>');
                 pre.focus();
                 document.execCommand('selectAll', false, null);
                 document.execCommand('insertHTML', false, html);
