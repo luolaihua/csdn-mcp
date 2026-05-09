@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 """
-CSDN MCP Server v5 — Cookie 持久化 + URL 捕获 + 封面 + 专栏
+CSDN MCP Server v9 — 内联图片自动上传 + 换行缩进修复
 
-新增：
-- Cookie 持久化：重启后自动恢复登录态，免重复扫码
-- 发布后自动返回文章 URL
-- 封面图上传支持（cover_path / frontmatter cover 字段）
-- 分类专栏选择支持（category 参数）
 """
 import json
+import re
 import asyncio
 from pathlib import Path
 from fastmcp import FastMCP
@@ -39,7 +35,27 @@ SELECTORS = {
     "final_publish": '//div[@role="dialog"]//button[contains(@class,"btn-b-red") and contains(text(),"发布文章")]',
     "cover_btn": '//div[@role="dialog"]//button[contains(text(),"从本地上传")]',
     "category_cb": '//div[@role="dialog"]//input[@type="checkbox" and @value="{cat}"]',
+    "img_btn": 'button.navigation-bar__button:has-text("图片")',
+    "img_modal": 'div[role="dialog"][aria-label="Insert image"]',
+    "img_input": 'div[role="dialog"][aria-label="Insert image"] input[type="file"]',
 }
+
+
+# ====== 辅助函数 ======
+
+def _js_escape(text: str) -> str:
+    """转义为 JS 模板字符串（保留换行/中文，不转 \\u）"""
+    return text.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+
+def _resolve_image_path(img_path: str, base_dir: Path) -> Path | None:
+    """解析图片路径，返回绝对路径或 None"""
+    p = Path(img_path)
+    if p.is_absolute() and p.exists():
+        return p
+    resolved = base_dir / p
+    if resolved.exists():
+        return resolved
+    return None
 
 
 # ====== Cookie 持久化 ======
@@ -83,6 +99,54 @@ def _parse_front_matter(text: str) -> dict:
             k, _, v = line.partition(":")
             result[k.strip()] = v.strip().strip('"').strip("'")
     return result
+
+
+async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
+    """扫描 markdown 中的本地图片，上传到 CSDN 图床，返回替换后的正文"""
+    img_pattern = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
+    uploads = []
+    for m in img_pattern.finditer(body):
+        path = m.group(2)
+        if path.startswith(('http://', 'https://', 'data:')):
+            continue
+        abs_path = _resolve_image_path(path, base_dir)
+        if abs_path:
+            uploads.append((m.group(0), m.group(1), str(abs_path), path))
+    
+    if not uploads:
+        return body
+    
+    replacements = {}
+    for full, alt, abs_path, orig_path in uploads:
+        try:
+            btn = await page.wait_for_selector(SELECTORS["img_btn"], timeout=5000)
+            await btn.click()
+            await asyncio.sleep(1)
+            fi = await page.wait_for_selector(SELECTORS["img_input"], timeout=5000)
+            await fi.set_input_files(abs_path)
+            await asyncio.sleep(5)  # 等 CSDN 上传
+            
+            csdn_url = await page.evaluate("""() => {
+                var cm = document.querySelector('.CodeMirror');
+                if (!cm || !cm.CodeMirror) return null;
+                var text = cm.CodeMirror.getValue();
+                var m = text.match(/!\\[.*?\\]\\((https:\\/\\/img-blog\\.csdnimg\\.cn\\/[^)]+)\\)/g);
+                return m ? m[m.length-1].match(/\\(([^)]+)\\)/)[1] : null;
+            }""")
+            if csdn_url:
+                replacements[orig_path] = csdn_url
+        except Exception as e:
+            print(f"  ⚠ 图片上传失败 {abs_path}: {e}")
+    
+    for old, new in replacements.items():
+        body = body.replace(f'({old})', f'({new})')
+    
+    # 清空 CodeMirror，准备正式注入
+    await page.evaluate("""() => {
+        var cm = document.querySelector('.CodeMirror');
+        if (cm && cm.CodeMirror) cm.CodeMirror.setValue('');
+    }""")
+    return body
 
 
 # ====== MCP Tools ======
@@ -214,13 +278,16 @@ async def csdn_publish(
         await title_el.fill(title)
         await asyncio.sleep(1)
 
-        # 3. CodeMirror 注入正文 + 触发自动保存
-        escaped = json.dumps(body)
+        # 3. 上传内联图片 + 注入正文 + 触发自动保存
+        base_dir = Path(markdown_path).parent if markdown_path else Path.cwd()
+        body = await _upload_inline_images(page, body, base_dir)
+        
+        escaped = _js_escape(body)
         ok = await page.evaluate(f"""
         (function(){{
             var cm = document.querySelector('.CodeMirror');
             if(cm && cm.CodeMirror){{
-                cm.CodeMirror.setValue({escaped});
+                cm.CodeMirror.setValue(`{escaped}`);
                 cm.CodeMirror.focus();
                 cm.dispatchEvent(new Event('input', {{bubbles:true}}));
                 var ta = cm.querySelector('textarea');
