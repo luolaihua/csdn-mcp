@@ -1,0 +1,153 @@
+<svg viewBox="0 0 1050 560">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+          </marker>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+          </marker>
+          <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185"/>
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+
+        <!-- ===== Boundaries ===== -->
+        <!-- AI Side -->
+        <rect x="20" y="40" width="280" height="490" rx="12" fill="rgba(34, 211, 238, 0.03)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="58" fill="#22d3ee" font-size="10" font-weight="600">AI Assistant (Hermes / Claude / etc.)</text>
+
+        <!-- MCP Server Side -->
+        <rect x="330" y="40" width="330" height="490" rx="12" fill="rgba(52, 211, 153, 0.03)" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="342" y="58" fill="#34d399" font-size="10" font-weight="600">CSDN MCP Server (FastMCP + Playwright)</text>
+
+        <!-- CSDN Platform -->
+        <rect x="690" y="40" width="340" height="490" rx="12" fill="rgba(251, 191, 36, 0.03)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="702" y="58" fill="#fbbf24" font-size="10" font-weight="600">CSDN Platform</text>
+
+        <!-- ===== Components ===== -->
+        <!-- AI Agent -->
+        <rect x="60" y="90" width="160" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <rect x="60" y="90" width="160" height="70" rx="6" fill="#0f172a"/>
+        <rect x="60" y="90" width="160" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="140" y="118" fill="white" font-size="12" font-weight="600" text-anchor="middle">AI Agent</text>
+        <text x="140" y="136" fill="#94a3b8" font-size="9" text-anchor="middle">Thinks &amp; Decides</text>
+        <text x="140" y="150" fill="#22d3ee" font-size="8" text-anchor="middle">Initiates tool calls</text>
+
+        <!-- MCP Protocol Box -->
+        <rect x="260" y="95" width="30" height="55" rx="4" fill="rgba(30, 41, 59, 0.5)" stroke="#64748b" stroke-width="1"/>
+        <text x="275" y="128" fill="#94a3b8" font-size="7" text-anchor="middle" transform="rotate(-90, 275, 128)">MCP</text>
+
+        <!-- MCP Server Core -->
+        <rect x="370" y="90" width="180" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="370" y="90" width="180" height="80" rx="6" fill="#0f172a"/>
+        <rect x="370" y="90" width="180" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="460" y="115" fill="white" font-size="11" font-weight="600" text-anchor="middle">MCP Server</text>
+        <text x="460" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">FastMCP + Async Playwright</text>
+        <text x="460" y="147" fill="#94a3b8" font-size="8" text-anchor="middle">4 MCP Tools</text>
+        <text x="460" y="162" fill="#34d399" font-size="7" text-anchor="middle">Persistent browser context</text>
+
+        <!-- Tools List -->
+        <rect x="370" y="195" width="180" height="90" rx="6" fill="rgba(6, 78, 59, 0.3)" stroke="#34d399" stroke-width="1"/>
+        <text x="460" y="215" fill="white" font-size="9" font-weight="600" text-anchor="middle">MCP Tools</text>
+        <text x="460" y="232" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_login</text>
+        <text x="460" y="246" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_confirm</text>
+        <text x="460" y="260" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_check_login</text>
+        <text x="460" y="274" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_publish</text>
+
+        <!-- Playwright Browser -->
+        <rect x="610" y="90" width="160" height="70" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <rect x="610" y="90" width="160" height="70" rx="6" fill="#0f172a"/>
+        <rect x="610" y="90" width="160" height="70" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="690" y="115" fill="white" font-size="11" font-weight="600" text-anchor="middle">Playwright</text>
+        <text x="690" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Headless Chromium</text>
+        <text x="690" y="147" fill="#94a3b8" font-size="8" text-anchor="middle">Persistent Context</text>
+        <text x="690" y="162" fill="#fb923c" font-size="7" text-anchor="middle">Cookie &amp; Login State</text>
+
+        <!-- Cookie File -->
+        <rect x="610" y="195" width="160" height="45" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <rect x="610" y="195" width="160" height="45" rx="6" fill="#0f172a"/>
+        <rect x="610" y="195" width="160" height="45" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="690" y="215" fill="white" font-size="10" font-weight="600" text-anchor="middle">Cookie Storage</text>
+        <text x="690" y="232" fill="#94a3b8" font-size="8" text-anchor="middle">~/.hermes/csdn_cookies.json</text>
+
+        <!-- CSDN Login -->
+        <rect x="730" y="90" width="150" height="60" rx="6" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1.5"/>
+        <rect x="730" y="90" width="150" height="60" rx="6" fill="#0f172a"/>
+        <rect x="730" y="90" width="150" height="60" rx="6" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="805" y="115" fill="white" font-size="11" font-weight="600" text-anchor="middle">CSDN Login</text>
+        <text x="805" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">WeChat QR Scan</text>
+        <text x="805" y="147" fill="#fb7185" font-size="7" text-anchor="middle">passport.csdn.net</text>
+
+        <!-- CSDN Editor -->
+        <rect x="730" y="195" width="150" height="60" rx="6" fill="rgba(120, 53, 15, 0.25)" stroke="#fbbf24" stroke-width="1.5"/>
+        <rect x="730" y="195" width="150" height="60" rx="6" fill="#0f172a"/>
+        <rect x="730" y="195" width="150" height="60" rx="6" fill="rgba(120, 53, 15, 0.25)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="805" y="220" fill="white" font-size="11" font-weight="600" text-anchor="middle">CSDN Editor</text>
+        <text x="805" y="237" fill="#94a3b8" font-size="8" text-anchor="middle">CodeMirror Markdown</text>
+        <text x="805" y="252" fill="#fbbf24" font-size="7" text-anchor="middle">editor.csdn.net</text>
+
+        <!-- User -->
+        <rect x="60" y="400" width="160" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <rect x="60" y="400" width="160" height="55" rx="6" fill="#0f172a"/>
+        <rect x="60" y="400" width="160" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="140" y="422" fill="white" font-size="11" font-weight="600" text-anchor="middle">User</text>
+        <text x="140" y="440" fill="#94a3b8" font-size="8" text-anchor="middle">WeChat / Feishu</text>
+        <text x="140" y="454" fill="#94a3b8" font-size="7" text-anchor="middle">Scans QR code</text>
+
+        <!-- ===== Arrows ===== -->
+        <!-- AI → MCP Server -->
+        <line x1="220" y1="125" x2="368" y2="125" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+        <text x="294" y="119" fill="#94a3b8" font-size="8" text-anchor="middle">Tool Call</text>
+
+        <!-- MCP Server → Playwright -->
+        <line x1="550" y1="125" x2="608" y2="125" stroke="#34d399" stroke-width="2" marker-end="url(#arrow-emerald)"/>
+        <text x="579" y="119" fill="#94a3b8" font-size="8" text-anchor="middle">async</text>
+
+        <!-- Playwright → CSDN Login -->
+        <line x1="770" y1="118" x2="728" y2="118" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-rose)"/>
+        <text x="749" y="112" fill="#fb7185" font-size="7" text-anchor="middle">QR page</text>
+
+        <!-- Playwright → CSDN Editor -->
+        <line x1="770" y1="222" x2="728" y2="222" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="749" y="216" fill="#94a3b8" font-size="7" text-anchor="middle">publish</text>
+
+        <!-- MCP Server → Cookie File -->
+        <line x1="550" y1="217" x2="608" y2="217" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="579" y="211" fill="#94a3b8" font-size="7" text-anchor="middle">save</text>
+
+        <!-- User → QR Scan -->
+        <path d="M 220 427 Q 280 427 280 380 Q 280 155 370 155" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,5"/>
+        <text x="300" y="290" fill="#94a3b8" font-size="7">scan QR</text>
+
+        <!-- Login callback -->
+        <path d="M 805 150 Q 805 320 690 320 Q 630 320 630 240" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,5"/>
+        <text x="720" y="295" fill="#fb7185" font-size="7">login callback</text>
+
+        <!-- ===== Sequence annotations ===== -->
+        <text x="60" y="490" fill="#22d3ee" font-size="8" font-weight="600">1. csdn_login() → QR</text>
+        <text x="350" y="490" fill="#34d399" font-size="8" font-weight="600">2. csdn_confirm() → check login</text>
+        <text x="700" y="490" fill="#fbbf24" font-size="8" font-weight="600">3. csdn_publish() → draft/publish</text>
+
+        <!-- ===== Legend ===== -->
+        <text x="370" y="340" fill="white" font-size="9" font-weight="600">Legend</text>
+        <rect x="370" y="352" width="14" height="8" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="390" y="360" fill="#94a3b8" font-size="7">AI Layer</text>
+        <rect x="440" y="352" width="14" height="8" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="460" y="360" fill="#94a3b8" font-size="7">MCP Server</text>
+        <rect x="540" y="352" width="14" height="8" rx="2" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1"/>
+        <text x="560" y="360" fill="#94a3b8" font-size="7">Browser</text>
+        <rect x="620" y="352" width="14" height="8" rx="2" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1"/>
+        <text x="640" y="360" fill="#94a3b8" font-size="7">Auth</text>
+        <line x1="370" y1="376" x2="384" y2="376" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="390" y="379" fill="#94a3b8" font-size="7">User interaction</text>
+        <line x1="460" y1="376" x2="474" y2="376" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="480" y="379" fill="#94a3b8" font-size="7">Auth flow</text>
+      </svg>

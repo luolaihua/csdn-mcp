@@ -1,0 +1,3 @@
+fastmcp>=3.0
+playwright>=1.40
+pyperclip>=1.8
