@@ -160,13 +160,6 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
     for old, new in replacements.items():
         body = body.replace(f'({old})', f'({new})')
     
-    # 清空编辑器，准备正式注入
-    await page.evaluate("""() => {
-        var pre = document.querySelector('pre.editor__inner');
-        if (pre && pre.isContentEditable) { pre.textContent = ''; return; }
-        var cm = document.querySelector('.CodeMirror');
-        if (cm && cm.CodeMirror) cm.CodeMirror.setValue('');
-    }""")
     return body
 
 
