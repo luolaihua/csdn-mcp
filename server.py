@@ -38,6 +38,7 @@ SELECTORS = {
     "img_btn": 'button.navigation-bar__button:has-text("图片")',
     "img_modal": 'div[role="dialog"][aria-label="Insert image"]',
     "img_input": 'div[role="dialog"][aria-label="Insert image"] input[type="file"]',
+    "editor_body": 'pre.editor__inner',
 }
 
 
@@ -127,11 +128,21 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
             await asyncio.sleep(5)  # 等 CSDN 上传
             
             csdn_url = await page.evaluate("""() => {
+                // 新编辑器：读 contenteditable pre
+                var pre = document.querySelector('pre.editor__inner');
+                if (pre) {
+                    var text = pre.textContent || '';
+                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/img-blog\\.csdnimg\\.cn\\/[^)]+)\\)/g);
+                    if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
+                }
+                // 旧版 CodeMirror
                 var cm = document.querySelector('.CodeMirror');
-                if (!cm || !cm.CodeMirror) return null;
-                var text = cm.CodeMirror.getValue();
-                var m = text.match(/!\\[.*?\\]\\((https:\\/\\/img-blog\\.csdnimg\\.cn\\/[^)]+)\\)/g);
-                return m ? m[m.length-1].match(/\\(([^)]+)\\)/)[1] : null;
+                if (cm && cm.CodeMirror) {
+                    var text = cm.CodeMirror.getValue();
+                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/img-blog\\.csdnimg\\.cn\\/[^)]+)\\)/g);
+                    if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
+                }
+                return null;
             }""")
             if csdn_url:
                 replacements[orig_path] = csdn_url
@@ -141,8 +152,10 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
     for old, new in replacements.items():
         body = body.replace(f'({old})', f'({new})')
     
-    # 清空 CodeMirror，准备正式注入
+    # 清空编辑器，准备正式注入
     await page.evaluate("""() => {
+        var pre = document.querySelector('pre.editor__inner');
+        if (pre && pre.isContentEditable) { pre.textContent = ''; return; }
         var cm = document.querySelector('.CodeMirror');
         if (cm && cm.CodeMirror) cm.CodeMirror.setValue('');
     }""")
@@ -278,29 +291,37 @@ async def csdn_publish(
         await title_el.fill(title)
         await asyncio.sleep(1)
 
-        # 3. 上传内联图片 + 注入正文 + 触发自动保存
+        # 3. 上传内联图片 + 注入正文
         base_dir = Path(markdown_path).parent if markdown_path else Path.cwd()
         body = await _upload_inline_images(page, body, base_dir)
         
         escaped = _js_escape(body)
         ok = await page.evaluate(f"""
         (function(){{
+            // 优先 CodeMirror（旧版编辑器）
             var cm = document.querySelector('.CodeMirror');
             if(cm && cm.CodeMirror){{
                 cm.CodeMirror.setValue(`{escaped}`);
                 cm.CodeMirror.focus();
                 cm.dispatchEvent(new Event('input', {{bubbles:true}}));
-                var ta = cm.querySelector('textarea');
-                if(ta){{ ta.dispatchEvent(new Event('input', {{bubbles:true}})); }}
-                return true;
+                return 'codemirror';
+            }}
+            // 新版 contenteditable 编辑器
+            var pre = document.querySelector('pre.editor__inner');
+            if(pre && pre.isContentEditable){{
+                pre.textContent = `{escaped}`;
+                pre.dispatchEvent(new Event('input', {{bubbles:true}}));
+                return 'contenteditable';
             }}
             return false;
         }})()
         """)
+        
         if not ok:
+            # 终极 fallback：键盘输入
             await page.click('.editor')
-            await asyncio.sleep(1)
-            await page.keyboard.insert_text(body[:5000])
+            await asyncio.sleep(0.5)
+            await page.keyboard.insert_text(body)
         else:
             await page.click('.editor')
             await asyncio.sleep(0.5)
