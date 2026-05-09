@@ -117,10 +117,14 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
     if not uploads:
         return body
     
-    # 清除 CSDN 默认模板
+    # 清除 CSDN 默认模板（execCommand 确保框架感知）
     await page.evaluate("""() => {
         var pre = document.querySelector('pre.editor__inner');
-        if (pre && pre.isContentEditable) { pre.textContent = ''; }
+        if (pre && pre.isContentEditable) {
+            pre.focus();
+            document.execCommand('selectAll', false, null);
+            document.execCommand('insertText', false, '');
+        }
     }""")
     
     replacements = {}
@@ -307,10 +311,12 @@ async def csdn_publish(
                 cm.dispatchEvent(new Event('input', {{bubbles:true}}));
                 return 'codemirror';
             }}
-            // 新版 contenteditable 编辑器
+            // 新版 contenteditable 编辑器（execCommand 触发框架感知）
             var pre = document.querySelector('pre.editor__inner');
             if(pre && pre.isContentEditable){{
-                pre.textContent = `{escaped}`;
+                pre.focus();
+                document.execCommand('selectAll', false, null);
+                document.execCommand('insertText', false, `{escaped}`);
                 pre.dispatchEvent(new Event('input', {{bubbles:true}}));
                 return 'contenteditable';
             }}
