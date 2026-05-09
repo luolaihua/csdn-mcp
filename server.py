@@ -32,14 +32,13 @@ CSDN_EDITOR = "https://editor.csdn.net/md/"
 SELECTORS = {
     "title": '//div[contains(@class,"article-bar")]//input[contains(@placeholder,"请输入文章标题")]',
     "publish_btn": '//button[contains(@class,"btn-publish") and contains(text(),"发布文章")]',
-    "tag_add": '//div[@class="mark_selection"]//button[contains(text(),"添加文章标签")]',
+    "tag_add": '//div[@class="modal"]//button[contains(text(),"添加文章标签")]',
     "tag_input": '//div[contains(@class,"mark_selection_box")]//input[contains(@placeholder,"请输入文字搜索")]',
     "tag_close": '//div[contains(@class,"mark_selection_box")]//button[@title="关闭"]',
     "summary": '//div[@class="desc-box"]//textarea[contains(@placeholder,"摘要")]',
-    "final_publish": '//div[contains(@class,"modal__button-bar")]//button[contains(text(),"发布文章")]',
-    "cover_input": '//div[contains(@class,"article-cover")]//input[@type="file"]',
-    "category_btn": '//div[@class="modal__content"]//button[contains(text(),"新建分类专栏")]',
-    "category_close": '//div[@class="modal__content"]//button[@title="关闭"]',
+    "final_publish": '//div[@role="dialog"]//button[contains(@class,"btn-b-red") and contains(text(),"发布文章")]',
+    "cover_input": '//div[@role="dialog"]//input[@type="file" and contains(@class,"el-upload")]',
+    "category_cb": '//div[@role="dialog"]//input[@type="checkbox" and @value="{cat}"]',
 }
 
 
@@ -281,18 +280,14 @@ async def csdn_publish(
                 await close_btn.click()
             except: pass
 
-        # 分类专栏
+        # 分类专栏（直接勾选可见checkbox）
         cat = category or fm.get("category", "")
         if cat:
             try:
-                cb = await page.wait_for_selector(f'xpath={SELECTORS["category_btn"]}', timeout=5000)
-                await cb.click()
-                await asyncio.sleep(1)
-                cat_cb = await page.wait_for_selector(
-                    f'xpath=//input[@type="checkbox" and @value="{cat}"]/..', timeout=5000)
+                cat_xpath = SELECTORS["category_cb"].replace("{cat}", cat)
+                cat_cb = await page.wait_for_selector(f"xpath={cat_xpath}", timeout=5000)
                 await cat_cb.click()
-                close_btn = await page.wait_for_selector(f'xpath={SELECTORS["category_close"]}', timeout=5000)
-                await close_btn.click()
+                await asyncio.sleep(0.5)
             except: pass
 
         # 最终发布
