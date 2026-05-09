@@ -37,7 +37,7 @@ SELECTORS = {
     "tag_close": '//div[contains(@class,"mark_selection_box")]//button[@title="关闭"]',
     "summary": '//div[@class="desc-box"]//textarea[contains(@placeholder,"摘要")]',
     "final_publish": '//div[@role="dialog"]//button[contains(@class,"btn-b-red") and contains(text(),"发布文章")]',
-    "cover_input": '//div[@role="dialog"]//input[@type="file" and contains(@class,"el-upload")]',
+    "cover_btn": '//div[@role="dialog"]//button[contains(text(),"从本地上传")]',
     "category_cb": '//div[@role="dialog"]//input[@type="checkbox" and @value="{cat}"]',
 }
 
@@ -255,13 +255,17 @@ async def csdn_publish(
         await pb.click()
         await asyncio.sleep(3)
 
-        # 封面图上传
-        if cover:
+        # 封面图上传（Element UI upload，需 file_chooser）
+        if cover and Path(cover).exists():
             try:
-                ci = await page.wait_for_selector(f'xpath={SELECTORS["cover_input"]}', timeout=5000)
-                await ci.set_input_files(cover)
-                await asyncio.sleep(2)
-            except: pass
+                async with page.expect_file_chooser() as fc_info:
+                    cb = await page.wait_for_selector(f'xpath={SELECTORS["cover_btn"]}', timeout=5000)
+                    await cb.click()
+                file_chooser = await fc_info.value
+                await file_chooser.set_files(cover)
+                await asyncio.sleep(3)  # 等 CSDN 上传
+            except Exception as e:
+                pass
 
         # 标签
         tag_list = [t.strip() for t in (tags or fm.get("tags","")).replace("，",",").split(",") if t.strip()]
