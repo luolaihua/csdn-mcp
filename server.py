@@ -299,15 +299,36 @@ async def csdn_publish(
         final = await page.wait_for_selector(f'xpath={SELECTORS["final_publish"]}', timeout=10000)
         await final.click()
 
-        # 等待发布完成 + 捕获文章 URL
+        # 等待发布完成 + 捕获文章 URL（双策略）
         article_url = None
-        for _ in range(12):
-            await asyncio.sleep(1)
-            for pg in _context.pages:
-                if "blog.csdn.net" in pg.url and "/article/details/" in pg.url:
-                    article_url = pg.url; break
-            if article_url:
-                break
+        # 策略1: 检查当前页是否被重定向到文章页
+        await asyncio.sleep(4)
+        try:
+            current = page.url
+            if "blog.csdn.net" in current and "/article/details/" in current:
+                article_url = current
+        except: pass
+        # 策略2: 扫描所有页面（新标签页）
+        if not article_url:
+            for _ in range(10):
+                await asyncio.sleep(1)
+                for pg in _context.pages:
+                    if "blog.csdn.net" in pg.url and "/article/details/" in pg.url:
+                        article_url = pg.url; break
+                if article_url:
+                    break
+        # 策略3: 去文章管理页拿最新文章链接
+        if not article_url:
+            try:
+                mgmt = await _context.new_page()
+                await mgmt.goto("https://mp.csdn.net/mp_blog/manage/article", wait_until="domcontentloaded", timeout=15000)
+                await asyncio.sleep(3)
+                article_url = await mgmt.evaluate("""() => {
+                    var a = document.querySelector('a[href*=\"article/details\"]');
+                    return a ? a.href : null;
+                }""")
+                await mgmt.close()
+            except: pass
 
         await page.close()
 
