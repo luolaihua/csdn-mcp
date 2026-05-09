@@ -117,6 +117,12 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
     if not uploads:
         return body
     
+    # 清除 CSDN 默认模板
+    await page.evaluate("""() => {
+        var pre = document.querySelector('pre.editor__inner');
+        if (pre && pre.isContentEditable) { pre.textContent = ''; }
+    }""")
+    
     replacements = {}
     for full, alt, abs_path, orig_path in uploads:
         try:
@@ -128,18 +134,20 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
             await asyncio.sleep(5)  # 等 CSDN 上传
             
             csdn_url = await page.evaluate("""() => {
-                // 新编辑器：读 contenteditable pre
+                // CSDN 图片域名（新旧兼容）
+                var pattern = /!\\[.*?\\]\\((https:\\/\\/(?:img-blog|i-blog)\\.csdnimg\\.cn\\/[^)]+)\\)/g;
+                // 新编辑器
                 var pre = document.querySelector('pre.editor__inner');
                 if (pre) {
                     var text = pre.textContent || '';
-                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/img-blog\\.csdnimg\\.cn\\/[^)]+)\\)/g);
+                    var m = text.match(pattern);
                     if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
                 }
                 // 旧版 CodeMirror
                 var cm = document.querySelector('.CodeMirror');
                 if (cm && cm.CodeMirror) {
                     var text = cm.CodeMirror.getValue();
-                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/img-blog\\.csdnimg\\.cn\\/[^)]+)\\)/g);
+                    var m = text.match(pattern);
                     if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
                 }
                 return null;
