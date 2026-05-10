@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CSDN MCP Server v9 — 内联图片自动上传 + 换行缩进修复
+CSDN MCP Server v18 — fix: innerHTML img search for upload extraction
 
 """
 import json
@@ -39,6 +39,8 @@ SELECTORS = {
     "img_modal": 'div[role="dialog"][aria-label="Insert image"]',
     "img_input": 'div[role="dialog"][aria-label="Insert image"] input[type="file"]',
     "editor_body": 'pre.editor__inner',
+    "save_btn_bottom": 'button.btn-save',
+    "save_btn_toolbar": 'button.button-save',
 }
 
 
@@ -138,20 +140,24 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
             await asyncio.sleep(5)  # 等 CSDN 上传
             
             csdn_url = await page.evaluate("""() => {
-                // CSDN 图片域名（新旧兼容）
-                var pattern = /!\\[.*?\\]\\((https:\\/\\/(?:img-blog|i-blog)\\.csdnimg\\.cn\\/[^)]+)\\)/g;
-                // 新编辑器
+                // 优先找编辑器里最近插入的 <img> 标签（CSDN 图片域名）
                 var pre = document.querySelector('pre.editor__inner');
                 if (pre) {
+                    var imgs = pre.querySelectorAll('img');
+                    for (var i = imgs.length - 1; i >= 0; i--) {
+                        var src = imgs[i].src;
+                        if (/(?:img-blog|i-blog)\\.csdnimg\\.cn/.test(src)) return src;
+                    }
+                    // fallback: 搜 markdown 语法
                     var text = pre.textContent || '';
-                    var m = text.match(pattern);
+                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/(?:img-blog|i-blog)\\.csdnimg\\.cn\\/[^)]+)\\)/g);
                     if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
                 }
                 // 旧版 CodeMirror
                 var cm = document.querySelector('.CodeMirror');
                 if (cm && cm.CodeMirror) {
                     var text = cm.CodeMirror.getValue();
-                    var m = text.match(pattern);
+                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/(?:img-blog|i-blog)\\.csdnimg\\.cn\\/[^)]+)\\)/g);
                     if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
                 }
                 return null;
@@ -300,30 +306,29 @@ async def csdn_publish(
         base_dir = Path(markdown_path).parent if markdown_path else Path.cwd()
         body = await _upload_inline_images(page, body, base_dir)
         
-        escaped = _js_escape(body)
-        ok = await page.evaluate(f"""
-        (function(){{
+        ok = await page.evaluate("""
+        (escaped) => {
             // 优先 CodeMirror（旧版编辑器）
             var cm = document.querySelector('.CodeMirror');
-            if(cm && cm.CodeMirror){{
-                cm.CodeMirror.setValue(`{escaped}`);
+            if(cm && cm.CodeMirror){
+                cm.CodeMirror.setValue(escaped);
                 cm.CodeMirror.focus();
-                cm.dispatchEvent(new Event('input', {{bubbles:true}}));
+                cm.dispatchEvent(new Event('input', {bubbles:true}));
                 return 'codemirror';
-            }}
+            }
             // 新版 contenteditable 编辑器（insertHTML 保留换行）
             var pre = document.querySelector('pre.editor__inner');
-            if(pre && pre.isContentEditable){{
-                var html = `{escaped}`.replace(/\\n/g, '<br>');
+            if(pre && pre.isContentEditable){
+                var html = escaped.replace(/\\n/g, '<br>');
                 pre.focus();
                 document.execCommand('selectAll', false, null);
                 document.execCommand('insertHTML', false, html);
-                pre.dispatchEvent(new Event('input', {{bubbles:true}}));
+                pre.dispatchEvent(new Event('input', {bubbles:true}));
                 return 'contenteditable';
-            }}
+            }
             return false;
-        }})()
-        """)
+        }
+        """, body)
         
         if not ok:
             # 终极 fallback：键盘输入
@@ -338,21 +343,42 @@ async def csdn_publish(
 
         if draft:
             try:
-                save_btn = await page.wait_for_selector('button.button-save', timeout=5000)
+                # 尝试多个选择器定位保存按钮
+                save_btn = None
+                for sel in [SELECTORS["save_btn_bottom"], SELECTORS["save_btn_toolbar"]]:
+                    try:
+                        save_btn = await page.wait_for_selector(sel, timeout=3000)
+                        if save_btn:
+                            break
+                    except:
+                        continue
+                # 终极 fallback：eval 找文本含"保存"的可见按钮
+                if not save_btn:
+                    save_btn = await page.evaluate_handle('''() => {
+                        const btns = document.querySelectorAll('button');
+                        for (const b of btns) {
+                            if (b.offsetWidth > 0 && b.offsetHeight > 0 &&
+                                (b.textContent.includes('保存') || b.textContent.includes('草稿'))) {
+                                return b;
+                            }
+                        }
+                        return null;
+                    }''')
+                    if not save_btn:
+                        raise Exception("找不到保存按钮")
                 await save_btn.click()
-                await asyncio.sleep(4)
+                await asyncio.sleep(5)
                 m = None
                 import re as _re
                 try:
                     m = _re.search(r'articleId=(\d+)', page.url)
                 except: pass
-                # 也检查 URL 历史
                 aid = m.group(1) if m else None
                 msg = f"✅ 「{title}」已保存到草稿箱"
                 if aid: msg += f"\n🔗 https://editor.csdn.net/md/?articleId={aid}"
-            except:
+            except Exception as e:
                 await asyncio.sleep(3)
-                msg = f"✅ 「{title}」内容已注入编辑器！请手动点击保存或到 CSDN 后台查看。"
+                msg = f"✅ 「{title}」内容已注入编辑器！请手动点击保存或到 CSDN 后台查看。\n(自动保存失败: {e})"
             return json.dumps({"success": True, "title": title, "message": msg}, ensure_ascii=False)
 
         # ====== 发布模式 ======
