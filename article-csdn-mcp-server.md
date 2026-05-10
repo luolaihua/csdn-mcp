@@ -1,104 +1,138 @@
 ---
-title: 我写了一个 CSDN MCP Server，让 AI 直接帮你发文章
-tags: MCP,Playwright,CSDN,AI,自动化
-description: 记录从零构建 CSDN MCP Server 的过程——让 AI 助手通过 MCP 协议直接发布文章到 CSDN，解决扫码登录、草稿保存、自动发布等全流程自动化
+title: AI 写文章、自动发 CSDN 和公众号，我是怎么做到的
+tags: Hermes,AI,MCP,CSDN,公众号,自动化
+cover: architecture.svg
+description: 让 AI 写完文章后，一句话自动发到 CSDN 和公众号，不用复制粘贴调格式
 ---
 
-## 动机
+写作不是最花时间的，发布才是。
 
-最近在用 Hermes 帮我写博客。流程是 AI 生成 Markdown → 我手动复制到 CSDN 编辑器 → 调格式 → 发布。每次都要切浏览器、扫码登录、粘贴、调分类标签，烦得很。
+我写技术文章的习惯：让 AI 帮我写完 → 手动复制到 CSDN → 调格式 → 找个图床传图 → 再复制到公众号编辑器 → 再调一遍格式。
 
-有没有可能让 AI 直接发到 CSDN？
+一篇文章写 20 分钟，发出去要半小时。
 
-查了一圈，CSDN 没有公开 API。市面上有个 `blog-auto-publishing-tools`，但两年没更新了。而且它依赖连接你本地已登录的 Chrome 浏览器——在 WSL 里根本连不上 Windows 的 Chrome。
+CSDN 没公开 API。公众号倒是有，但排版是出了名的反人类。网上的工具要么两年没更新，要么依赖你本地登录的 Chrome 浏览器，换台机器就得重配。
 
-那就自己写一个 MCP (Model Context Protocol) Server 吧。
+所以我自己搞了两套 MCP Server，把「发布」这个事做成了 AI 一句话的事。
 
-## 架构设计
+---
 
-核心思路：**Playwright 浏览器常驻在 MCP 进程里**，一次扫码登录后所有操作共享同一个浏览器上下文，登录态不会丢失。
+## 两套方案
 
-![架构图](architecture.png)
+### CSDN：用浏览器冒充人工
 
-整个流程分三步：
+CSDN 没 API，那就模拟人操作。Playwright 开一个 headless 浏览器常驻在 MCP 进程里：
 
-1. **`csdn_login`**：打开 CSDN 登录页，截取微信扫码二维码发给用户
-2. **`csdn_confirm`**：检测用户扫码后页面是否跳转，确认登录成功
-3. **`csdn_publish`**：打开 CSDN 编辑器，注入 Markdown 内容，默认存草稿（发布需用户确认）
+扫码登录 → 打开编辑器 → 注入 Markdown → 触发保存 → 发布。
 
-## 踩坑记录
+一次扫码后登录态写进 cookie 文件，后面不用再扫。
 
-这个项目看着简单，实际踩了不少坑。
+### 公众号：走正经 API
 
-### 坑一：线程安全
+文颜（Wenyan）是现成的 MCP Server，对接微信公众平台的素材和草稿箱接口。
 
-最初用的是 Playwright 的同步 API（`sync_playwright`），一跑就崩：
+你给 Markdown + 图片路径，格式转换 → 图片上传 → 主题渲染 → 推送草稿箱，一步到位。内置 8 套主题，不用自己写 CSS。
 
-```
-cannot switch to a different thread (which happens to have exited)
-```
+### 架构图
 
-原因：FastMCP 可能在**不同线程调度 tool 调用**，而 Playwright 的同步 API 要求所有操作在同一个线程。每次 tool 调用都创建新 page，上一个 page 属于不同线程——Playwright 直接炸。
+![架构图](architecture.svg)
 
-解决：全部改用 **async Playwright + asyncio**。异步 API 天生在 event loop 单线程运行，不会有跨线程问题。
+左边是 AI 助手，中间是 MCP Server，右边是对应的平台。你在对话里说一句话，剩下的全自动。
 
-### 坑二：扫码回调丢失
+---
 
-第一版设计是这样的：
+## 公众号：上手 5 分钟
 
-```
-csdn_login → 打开二维码页 → 截屏 → 关闭页面
-csdn_confirm → 打开新页面 → 跳编辑器 → 检测登录态
+第一步，拿凭证。去微信公众号后台 → 设置与开发 → 基本配置，复制 AppID 和 AppSecret。同一页面加 IP 白名单：
+
+```bash
+curl ifconfig.me  # 看你家机器的出口 IP
 ```
 
-结果 `csdn_confirm` 永远检测不到登录。因为**微信扫码的回调发生在原始页面上**，你把原始页面关了，新开的页面拿不到 callback。
+第二步，装工具：
 
-修了 v4 版本：**二维码页面保持存活**，`csdn_confirm` 直接检查这个页面的 URL 有没有跳转离开登录页。跳转了 = 扫码成功。
+```bash
+npm install -g @wenyan-md/mcp
+```
 
-### 坑三：草稿保存不触发
+第三步，配到 Hermes 的 config.yaml 里，重启 gateway，对话说「列出主题」验证连通性。
 
-CSDN 编辑器用 CodeMirror，内容我通过 `CodeMirror.setValue()` 注入——但这不触发编辑器的「修改事件」。CSDN 自动保存监听的是真实的 `input` 事件，编程式注入的内容被当空气。
+第四步，写文章时带上 frontmatter：
 
-修了两个 trick：
-1. 注入后用 `dispatchEvent(new Event('input'))` 模拟输入事件
-2. 再用 `page.keyboard.type(" ")` + `Backspace` 来一次真实的键盘输入
+```markdown
+---
+title: "标题"
+cover: /path/to/cover.png
+author: 你的名字
+---
+```
 
-两个叠加才真正唤醒了 CSDN 的自动保存机制。
+然后跟 Hermes 说：「发到公众号草稿箱，orangeheart 主题」。30 秒后草稿箱里就有了。
 
-### 坑四：「取消」按钮踩雷
+---
 
-有一版设计为了加标签，先打开发布弹窗，加完标签再点「取消」退回编辑器——结果连编辑内容一起取消了。后来干脆**草稿模式不碰发布弹窗**，纯靠自动保存。
+## CSDN：首次要扫码
 
-## 最终效果
+CSDN 这边需要多一步：装 Playwright 的浏览器：
 
-现在 AI 帮我写完博客后，对话里直接说「发到 CSDN 草稿箱」，一秒钟就上去了，全程不用切浏览器。
+```bash
+pip install playwright
+playwright install chromium-headless-shell
+```
 
-流程对比如下：
+把 CSDN MCP 加到 config.yaml，对话里说 `csdn_login`，弹出一个二维码，微信扫一下。之后 Cookie 持久化，不用再扫了。
 
-| 步骤 | 手动发布 | MCP 自动 |
-|------|---------|----------|
-| 登录 CSDN | 打开浏览器，扫码 | AI 自动生成二维码 |
-| 进入编辑器 | 点「写文章」 | AI 自动导航 |
-| 粘贴内容 | Ctrl+V | AI 注入 CodeMirror |
-| 保存草稿 | 等自动保存 | AI 触发保存事件 |
-| 发布 | 填标签 → 点发布 | AI 填标签 → 需确认后发布 |
+默认存草稿，确认后才发布。发布后自动返回文章链接。
 
-目前 CSDN MCP Server 已经开源在 GitHub：**https://github.com/luolaihua/csdn-mcp**（等 push 后可用）
+---
 
-配合微信公众平台的文颜 MCP，还能实现「一文多发」——写完自动同步到 CSDN 和公众号，对于有双平台发布需求的博主来说简直爽翻。
+## 双平台一起发
 
-## 后续计划
+两个 MCP 跑在同一个 Hermes 里，一个助手管两边。我现在的流程：
 
-- [ ] Cookie 持久化到文件，进程重启后恢复登录态（不用重新扫码）
-- [ ] 支持封面图上传
-- [ ] 支持分类专栏选择
-- [ ] 发布后自动返回文章 URL
+1. AI 写完 → 我快速过一遍
+2. 「发到公众号」→ 30 秒草稿箱到位
+3. 「发到 CSDN」→ 进草稿箱，看一眼没问题再确认发布
 
-欢迎 Star / PR。
+从搞定内容到两边都发好，5 分钟。
 
-## 参考链接
+---
 
-- [MCP 协议规范](https://modelcontextprotocol.io/)
-- [FastMCP 文档](https://gofastmcp.com/)
-- [Playwright Python](https://playwright.dev/python/)
-- [Wenyan MCP — 微信公众号发布](https://github.com/caol64/wenyan-mcp)
+## 踩过的坑
+
+**二维码页面不能关。** 微信扫码回调发生在原始页面上，你把页面关了，回调丢了，永远检测不到登录。这个问题修了好几版才发现。
+
+**CodeMirror.setValue() 不触发保存。** CSDN 编辑器监听的是真实 input 事件，编程式写进去的内容它当没发生。得 dispatchEvent + 模拟一次键盘输入，两个一起上才能唤醒自动保存。
+
+**IP 会变。** 公众号的 IP 白名单是硬绑定。家庭宽带或者 VPN 一换，IP 就变了，报 40164 就去后台更新一下。
+
+**运营商的网络一言难尽。** Playwright 下 CSDN 页面时要等所有资源加载完，但百度统计那些第三方资源经常超时。解决方案：只用 `domcontentloaded`，不等网络空闲。
+
+---
+
+## 公众号主题一览
+
+文颜内置 8 套主题，覆盖不同风格：
+
+| 主题 | 风格 | 适合 |
+|------|------|------|
+| Default | 简洁 | 长文 |
+| OrangeHeart | 暖橙 | 技术文（我常用） |
+| Rainbow | 多彩 | 轻松内容 |
+| Lapis | 蓝灰 | 产品设计 |
+| Pie | 现代 | 少数派风格 |
+| Maize | 淡黄 | 教程科普 |
+| Purple | 紫色 | 品牌调性 |
+| Phycat | 薄荷绿 | 结构化长文 |
+
+---
+
+## 最后说两句
+
+两套方案覆盖了我 90% 的发文场景：
+
+- 公众号有正经 API，一次配置，之后跟说话一样简单
+- CSDN 没 API，但浏览器自动化把「模拟人操作」这件事做到能用了
+- 两个 MCP 跑一起，一个 AI 助手发两边
+
+工具的意义不是炫技——是真省时间。一篇文章发布只要 30 秒，你自然会更愿意写。

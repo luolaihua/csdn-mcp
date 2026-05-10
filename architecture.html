@@ -1,244 +1,133 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CSDN MCP Server Architecture</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    .header { margin-bottom: 2rem; }
-    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
-    .pulse-dot { width: 12px; height: 12px; background: #34d399; border-radius: 50%; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    h1 { font-size: 1.5rem; font-weight: 700; }
-    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
-    .diagram-container { background: rgba(15, 23, 42, 0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
-    svg { width: 100%; min-width: 900px; display: block; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
-    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
-    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
-    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
-    .card-dot.cyan { background: #22d3ee; } .card-dot.emerald { background: #34d399; }
-    .card-dot.violet { background: #a78bfa; } .card-dot.rose { background: #fb7185; }
-    .card h3 { font-size: 0.875rem; font-weight: 600; }
-    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
-    .card li { margin-bottom: 0.375rem; }
-    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CSDN MCP Server 架构图</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#020617;padding:1rem}
+.container{max-width:820px;margin:0 auto}
+svg{width:100%;height:auto;display:block}
+</style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="header-row">
-        <div class="pulse-dot"></div>
-        <h1>CSDN MCP Server Architecture</h1>
-      </div>
-      <p class="subtitle">AI Assistant → MCP Protocol → Playwright → CSDN Platform</p>
-    </div>
+<div class="container">
 
-    <div class="diagram-container">
-      <svg viewBox="0 0 1050 560">
-        <defs>
-          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
-          </marker>
-          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
-          </marker>
-          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
-          </marker>
-          <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185"/>
-          </marker>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
-          </pattern>
-        </defs>
+<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#94a3b8"/>
+    </marker>
+    <marker id="ac" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#22d3ee"/>
+    </marker>
+    <marker id="ag" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#34d399"/>
+    </marker>
+    <pattern id="g" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M30 0L0 0 0 30" fill="none" stroke="#1e293b" stroke-width=".5"/>
+    </pattern>
+  </defs>
 
-        <rect width="100%" height="100%" fill="url(#grid)"/>
+  <rect width="800" height="420" fill="#020617"/>
+  <rect width="800" height="420" fill="url(#g)"/>
 
-        <!-- ===== Boundaries ===== -->
-        <!-- AI Side -->
-        <rect x="20" y="40" width="280" height="490" rx="12" fill="rgba(34, 211, 238, 0.03)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
-        <text x="32" y="58" fill="#22d3ee" font-size="10" font-weight="600">AI Assistant (Hermes / Claude / etc.)</text>
+  <!-- 三栏边界 -->
+  <rect x="12" y="25" width="210" height="370" rx="10" fill="rgba(34,211,238,.04)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="22" y="46" fill="#22d3ee" font-size="13" font-weight="700" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">AI 助手</text>
 
-        <!-- MCP Server Side -->
-        <rect x="330" y="40" width="330" height="490" rx="12" fill="rgba(52, 211, 153, 0.03)" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
-        <text x="342" y="58" fill="#34d399" font-size="10" font-weight="600">CSDN MCP Server (FastMCP + Playwright)</text>
+  <rect x="240" y="25" width="280" height="370" rx="10" fill="rgba(52,211,153,.04)" stroke="#34d399" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="250" y="46" fill="#34d399" font-size="13" font-weight="700" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">MCP Server</text>
 
-        <!-- CSDN Platform -->
-        <rect x="690" y="40" width="340" height="490" rx="12" fill="rgba(251, 191, 36, 0.03)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
-        <text x="702" y="58" fill="#fbbf24" font-size="10" font-weight="600">CSDN Platform</text>
+  <rect x="538" y="25" width="250" height="370" rx="10" fill="rgba(251,191,36,.04)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="548" y="46" fill="#fbbf24" font-size="13" font-weight="700" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">CSDN 平台</text>
 
-        <!-- ===== Components ===== -->
-        <!-- AI Agent -->
-        <rect x="60" y="90" width="160" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <rect x="60" y="90" width="160" height="70" rx="6" fill="#0f172a"/>
-        <rect x="60" y="90" width="160" height="70" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
-        <text x="140" y="118" fill="white" font-size="12" font-weight="600" text-anchor="middle">AI Agent</text>
-        <text x="140" y="136" fill="#94a3b8" font-size="9" text-anchor="middle">Thinks &amp; Decides</text>
-        <text x="140" y="150" fill="#22d3ee" font-size="8" text-anchor="middle">Initiates tool calls</text>
+  <!-- AI Agent -->
+  <rect x="30" y="70" width="140" height="55" rx="8" fill="rgba(8,51,68,.5)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="100" y="95" fill="#fff" font-size="16" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">AI Agent</text>
+  <text x="100" y="114" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">Hermes / Claude</text>
 
-        <!-- MCP Protocol Box -->
-        <rect x="260" y="95" width="30" height="55" rx="4" fill="rgba(30, 41, 59, 0.5)" stroke="#64748b" stroke-width="1"/>
-        <text x="275" y="128" fill="#94a3b8" font-size="7" text-anchor="middle" transform="rotate(-90, 275, 128)">MCP</text>
+  <!-- 用户 -->
+  <rect x="30" y="280" width="140" height="50" rx="8" fill="rgba(30,41,59,.5)" stroke="#64748b" stroke-width="1.5"/>
+  <text x="100" y="304" fill="#fff" font-size="16" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">用户</text>
+  <text x="100" y="322" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">微信扫码登录</text>
 
-        <!-- MCP Server Core -->
-        <rect x="370" y="90" width="180" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
-        <rect x="370" y="90" width="180" height="80" rx="6" fill="#0f172a"/>
-        <rect x="370" y="90" width="180" height="80" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
-        <text x="460" y="115" fill="white" font-size="11" font-weight="600" text-anchor="middle">MCP Server</text>
-        <text x="460" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">FastMCP + Async Playwright</text>
-        <text x="460" y="147" fill="#94a3b8" font-size="8" text-anchor="middle">4 MCP Tools</text>
-        <text x="460" y="162" fill="#34d399" font-size="7" text-anchor="middle">Persistent browser context</text>
+  <!-- MCP 协议 -->
+  <rect x="182" y="88" width="22" height="25" rx="4" fill="rgba(30,41,59,.5)" stroke="#64748b" stroke-width="1"/>
+  <text x="193" y="102" fill="#94a3b8" font-size="8" text-anchor="middle" transform="rotate(-90,193,102)" font-family="monospace">MCP</text>
 
-        <!-- Tools List -->
-        <rect x="370" y="195" width="180" height="90" rx="6" fill="rgba(6, 78, 59, 0.3)" stroke="#34d399" stroke-width="1"/>
-        <text x="460" y="215" fill="white" font-size="9" font-weight="600" text-anchor="middle">MCP Tools</text>
-        <text x="460" y="232" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_login</text>
-        <text x="460" y="246" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_confirm</text>
-        <text x="460" y="260" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_check_login</text>
-        <text x="460" y="274" fill="#94a3b8" font-size="8" text-anchor="middle">• csdn_publish</text>
+  <!-- MCP Server 核心 -->
+  <rect x="265" y="70" width="180" height="65" rx="8" fill="rgba(6,78,59,.5)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="355" y="95" fill="#fff" font-size="16" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">MCP Server</text>
+  <text x="355" y="114" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">FastMCP + Playwright</text>
+  <text x="355" y="128" fill="#34d399" font-size="10" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">浏览器常驻进程</text>
 
-        <!-- Playwright Browser -->
-        <rect x="610" y="90" width="160" height="70" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
-        <rect x="610" y="90" width="160" height="70" rx="6" fill="#0f172a"/>
-        <rect x="610" y="90" width="160" height="70" rx="6" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1.5"/>
-        <text x="690" y="115" fill="white" font-size="11" font-weight="600" text-anchor="middle">Playwright</text>
-        <text x="690" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">Headless Chromium</text>
-        <text x="690" y="147" fill="#94a3b8" font-size="8" text-anchor="middle">Persistent Context</text>
-        <text x="690" y="162" fill="#fb923c" font-size="7" text-anchor="middle">Cookie &amp; Login State</text>
+  <!-- 4 个 MCP 工具 -->
+  <rect x="265" y="165" width="180" height="95" rx="8" fill="rgba(6,78,59,.25)" stroke="#34d399" stroke-width="1"/>
+  <text x="355" y="187" fill="#fff" font-size="12" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">MCP 工具</text>
+  <text x="305" y="208" fill="#94a3b8" font-size="11" font-family="monospace">csdn_login</text>
+  <text x="305" y="226" fill="#94a3b8" font-size="11" font-family="monospace">csdn_confirm</text>
+  <text x="305" y="244" fill="#94a3b8" font-size="11" font-family="monospace">csdn_check_login</text>
+  <text x="305" y="262" fill="#94a3b8" font-size="11" font-family="monospace">csdn_publish</text>
 
-        <!-- Cookie File -->
-        <rect x="610" y="195" width="160" height="45" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
-        <rect x="610" y="195" width="160" height="45" rx="6" fill="#0f172a"/>
-        <rect x="610" y="195" width="160" height="45" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
-        <text x="690" y="215" fill="white" font-size="10" font-weight="600" text-anchor="middle">Cookie Storage</text>
-        <text x="690" y="232" fill="#94a3b8" font-size="8" text-anchor="middle">~/.hermes/csdn_cookies.json</text>
+  <!-- Cookie -->
+  <rect x="265" y="280" width="180" height="50" rx="8" fill="rgba(76,29,149,.35)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="355" y="304" fill="#fff" font-size="14" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">Cookie 持久化</text>
+  <text x="355" y="322" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">csdn_cookies.json</text>
 
-        <!-- CSDN Login -->
-        <rect x="730" y="90" width="150" height="60" rx="6" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1.5"/>
-        <rect x="730" y="90" width="150" height="60" rx="6" fill="#0f172a"/>
-        <rect x="730" y="90" width="150" height="60" rx="6" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1.5"/>
-        <text x="805" y="115" fill="white" font-size="11" font-weight="600" text-anchor="middle">CSDN Login</text>
-        <text x="805" y="132" fill="#94a3b8" font-size="8" text-anchor="middle">WeChat QR Scan</text>
-        <text x="805" y="147" fill="#fb7185" font-size="7" text-anchor="middle">passport.csdn.net</text>
+  <!-- Playwright -->
+  <rect x="580" y="70" width="140" height="55" rx="8" fill="rgba(251,146,60,.25)" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="650" y="95" fill="#fff" font-size="16" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">Playwright</text>
+  <text x="650" y="114" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">Headless Chromium</text>
 
-        <!-- CSDN Editor -->
-        <rect x="730" y="195" width="150" height="60" rx="6" fill="rgba(120, 53, 15, 0.25)" stroke="#fbbf24" stroke-width="1.5"/>
-        <rect x="730" y="195" width="150" height="60" rx="6" fill="#0f172a"/>
-        <rect x="730" y="195" width="150" height="60" rx="6" fill="rgba(120, 53, 15, 0.25)" stroke="#fbbf24" stroke-width="1.5"/>
-        <text x="805" y="220" fill="white" font-size="11" font-weight="600" text-anchor="middle">CSDN Editor</text>
-        <text x="805" y="237" fill="#94a3b8" font-size="8" text-anchor="middle">CodeMirror Markdown</text>
-        <text x="805" y="252" fill="#fbbf24" font-size="7" text-anchor="middle">editor.csdn.net</text>
+  <!-- CSDN 编辑器 -->
+  <rect x="580" y="175" width="140" height="55" rx="8" fill="rgba(120,53,15,.25)" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="650" y="200" fill="#fff" font-size="16" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">CSDN 编辑器</text>
+  <text x="650" y="219" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">编辑器注入 Markdown</text>
 
-        <!-- User -->
-        <rect x="60" y="400" width="160" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
-        <rect x="60" y="400" width="160" height="55" rx="6" fill="#0f172a"/>
-        <rect x="60" y="400" width="160" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
-        <text x="140" y="422" fill="white" font-size="11" font-weight="600" text-anchor="middle">User</text>
-        <text x="140" y="440" fill="#94a3b8" font-size="8" text-anchor="middle">WeChat / Feishu</text>
-        <text x="140" y="454" fill="#94a3b8" font-size="7" text-anchor="middle">Scans QR code</text>
+  <!-- 保存草稿 -->
+  <rect x="580" y="280" width="140" height="50" rx="8" fill="rgba(136,19,55,.3)" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="650" y="304" fill="#fff" font-size="14" font-weight="700" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">保存草稿</text>
+  <text x="650" y="322" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">触发自动保存</text>
 
-        <!-- ===== Arrows ===== -->
-        <!-- AI → MCP Server -->
-        <line x1="220" y1="125" x2="368" y2="125" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)"/>
-        <text x="294" y="119" fill="#94a3b8" font-size="8" text-anchor="middle">Tool Call</text>
+  <!-- ===== 箭头 ===== -->
 
-        <!-- MCP Server → Playwright -->
-        <line x1="550" y1="125" x2="608" y2="125" stroke="#34d399" stroke-width="2" marker-end="url(#arrow-emerald)"/>
-        <text x="579" y="119" fill="#94a3b8" font-size="8" text-anchor="middle">async</text>
+  <!-- AI → MCP -->
+  <line x1="170" y1="97" x2="263" y2="97" stroke="#22d3ee" stroke-width="2" marker-end="url(#ac)"/>
+  <text x="216" y="90" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">调用工具</text>
 
-        <!-- Playwright → CSDN Login -->
-        <line x1="770" y1="118" x2="728" y2="118" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-rose)"/>
-        <text x="749" y="112" fill="#fb7185" font-size="7" text-anchor="middle">QR page</text>
+  <!-- MCP → Playwright -->
+  <line x1="445" y1="97" x2="578" y2="97" stroke="#34d399" stroke-width="2" marker-end="url(#ag)"/>
+  <text x="511" y="90" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">浏览器操作</text>
 
-        <!-- Playwright → CSDN Editor -->
-        <line x1="770" y1="222" x2="728" y2="222" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <text x="749" y="216" fill="#94a3b8" font-size="7" text-anchor="middle">publish</text>
+  <!-- Playwright → 编辑器 -->
+  <line x1="650" y1="125" x2="650" y2="173" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="660" y="152" fill="#fbbf24" font-size="10" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">注入内容</text>
 
-        <!-- MCP Server → Cookie File -->
-        <line x1="550" y1="217" x2="608" y2="217" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <text x="579" y="211" fill="#94a3b8" font-size="7" text-anchor="middle">save</text>
+  <!-- MCP → Cookie -->
+  <line x1="355" y1="270" x2="355" y2="295" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#a)"/>
+  <text x="365" y="287" fill="#94a3b8" font-size="10" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">读写</text>
 
-        <!-- User → QR Scan -->
-        <path d="M 220 427 Q 280 427 280 380 Q 280 155 370 155" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,5"/>
-        <text x="300" y="290" fill="#94a3b8" font-size="7">scan QR</text>
+  <!-- 用户扫码（弯线，走中间上方） -->
+  <path d="M170 305 L230 305 L230 125 L578 125" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#a)"/>
+  <text x="295" y="158" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">扫码登录</text>
 
-        <!-- Login callback -->
-        <path d="M 805 150 Q 805 320 690 320 Q 630 320 630 240" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,5"/>
-        <text x="720" y="295" fill="#fb7185" font-size="7">login callback</text>
+  <!-- 登录回调（弯线，走中间下方） -->
+  <path d="M580 202 L500 202 L500 305 L447 305" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#a)"/>
+  <text x="500" y="285" fill="#fb7185" font-size="11" text-anchor="middle" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">回调确认</text>
 
-        <!-- ===== Sequence annotations ===== -->
-        <text x="60" y="490" fill="#22d3ee" font-size="8" font-weight="600">1. csdn_login() → QR</text>
-        <text x="350" y="490" fill="#34d399" font-size="8" font-weight="600">2. csdn_confirm() → check login</text>
-        <text x="700" y="490" fill="#fbbf24" font-size="8" font-weight="600">3. csdn_publish() → draft/publish</text>
+  <!-- ===== 底部流程条 ===== -->
+  <rect x="12" y="395" width="776" height="18" rx="5" fill="rgba(15,23,42,.7)"/>
+  <text x="25" y="408" fill="#22d3ee" font-size="10" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">csdn_login()</text>
+  <text x="120" y="408" fill="#94a3b8" font-size="10" text-anchor="middle">→</text>
+  <text x="145" y="408" fill="#34d399" font-size="10" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">csdn_confirm()</text>
+  <text x="255" y="408" fill="#94a3b8" font-size="10" text-anchor="middle">→</text>
+  <text x="280" y="408" fill="#fbbf24" font-size="10" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">csdn_publish()</text>
+  <text x="395" y="408" fill="#94a3b8" font-size="10" text-anchor="middle">→</text>
+  <text x="420" y="408" fill="#a78bfa" font-size="10" font-family="NotoSC, PingFang SC, Microsoft YaHei, sans-serif">csdn_check_login()</text>
+</svg>
 
-        <!-- ===== Legend ===== -->
-        <text x="370" y="340" fill="white" font-size="9" font-weight="600">Legend</text>
-        <rect x="370" y="352" width="14" height="8" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
-        <text x="390" y="360" fill="#94a3b8" font-size="7">AI Layer</text>
-        <rect x="440" y="352" width="14" height="8" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
-        <text x="460" y="360" fill="#94a3b8" font-size="7">MCP Server</text>
-        <rect x="540" y="352" width="14" height="8" rx="2" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1"/>
-        <text x="560" y="360" fill="#94a3b8" font-size="7">Browser</text>
-        <rect x="620" y="352" width="14" height="8" rx="2" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1"/>
-        <text x="640" y="360" fill="#94a3b8" font-size="7">Auth</text>
-        <line x1="370" y1="376" x2="384" y2="376" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3"/>
-        <text x="390" y="379" fill="#94a3b8" font-size="7">User interaction</text>
-        <line x1="460" y1="376" x2="474" y2="376" stroke="#fb7185" stroke-width="1" stroke-dasharray="3,3"/>
-        <text x="480" y="379" fill="#94a3b8" font-size="7">Auth flow</text>
-      </svg>
-    </div>
-
-    <div class="cards">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot emerald"></div>
-          <h3>Core Design</h3>
-        </div>
-        <ul>
-          <li>• Async Playwright with persistent browser context</li>
-          <li>• QR login page stays alive for callback</li>
-          <li>• Cookie-based session persistence</li>
-          <li>• Draft-first, publish requires user confirmation</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot cyan"></div>
-          <h3>Key Innovations</h3>
-        </div>
-        <ul>
-          <li>• Single browser context across all tool calls</li>
-          <li>• CodeMirror.setValue + keyboard events for auto-save</li>
-          <li>• Thread-safe async architecture</li>
-          <li>• WSL/headless compatible (no Chrome CDP needed)</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-dot rose"></div>
-          <h3>Use Cases</h3>
-        </div>
-        <ul>
-          <li>• AI writes blogs → auto-publish to CSDN</li>
-          <li>• Content pipeline automation</li>
-          <li>• Multi-platform syndication (w/ WeChat)</li>
-          <li>• Scheduled content publishing (via Hermes cron)</li>
-        </ul>
-      </div>
-    </div>
-
-    <p class="footer">
-      CSDN MCP Server • Built with FastMCP + Playwright • MIT License
-    </p>
-  </div>
+</div>
 </body>
 </html>

@@ -19,7 +19,7 @@ _login_page: Page | None = None
 _logged_in = False
 
 QR_FILE = Path("/tmp/csdn_qrcode.png")
-COOKIE_FILE = Path.home() / ".hermes" / "csdn_cookies.json"
+COOKIE_FILE = Path("/home/laihluo/.hermes") / "csdn_cookies.json"
 
 CSDN_HOME = "https://www.csdn.net/"
 CSDN_LOGIN = "https://passport.csdn.net/login?code=public"
@@ -36,8 +36,8 @@ SELECTORS = {
     "cover_btn": '//div[@role="dialog"]//button[contains(text(),"从本地上传")]',
     "category_cb": '//div[@role="dialog"]//input[@type="checkbox" and @value="{cat}"]',
     "img_btn": 'button.navigation-bar__button:has-text("图片")',
-    "img_modal": 'div[role="dialog"][aria-label="Insert image"]',
-    "img_input": 'div[role="dialog"][aria-label="Insert image"] input[type="file"]',
+    "img_modal": '.modal__inner-1[aria-label="Insert image"]',
+    "img_input": '.modal__inner-1[aria-label="Insert image"] input[type="file"]',
     "editor_body": 'pre.editor__inner',
     "save_btn_bottom": 'button.btn-save',
     "save_btn_toolbar": 'button.button-save',
@@ -105,7 +105,14 @@ def _parse_front_matter(text: str) -> dict:
 
 
 async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
-    """扫描 markdown 中的本地图片，上传到 CSDN 图床，返回替换后的正文"""
+    """扫描 markdown 中的本地图片，上传到 CSDN 图床，返回替换后的正文
+    
+    每个图片使用独立的 browser context 上传，避免 CSDN 的 localStorage 状态锁。
+    """
+    global _browser
+    from playwright.async_api import async_playwright
+    import json as _json
+    
     img_pattern = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
     uploads = []
     for m in img_pattern.finditer(body):
@@ -119,7 +126,73 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
     if not uploads:
         return body
     
-    # 清除 CSDN 默认模板（insertHTML 确保框架感知）
+    print(f"  📤 准备上传 {len(uploads)} 张图片（每张独立 context）")
+    
+    # 加载 cookies
+    cookies = []
+    if COOKIE_FILE.exists():
+        cookies = _json.loads(COOKIE_FILE.read_text())
+    
+    # 每个图片使用独立的 browser context 上传
+    urls_in_order = []
+    for idx, (full, alt, abs_path, orig_path) in enumerate(uploads):
+        print(f"    [{idx+1}/{len(uploads)}] {orig_path}...", end=" ", flush=True)
+        
+        ctx = await _browser.new_context(viewport={"width": 1280, "height": 800})
+        if cookies:
+            await ctx.add_cookies(cookies)
+        
+        upage = await ctx.new_page()
+        try:
+            await upage.goto(CSDN_EDITOR, wait_until="domcontentloaded", timeout=15000)
+            await asyncio.sleep(2)
+            
+            btn = await upage.wait_for_selector('button.navigation-bar__button:has-text("图片")', timeout=5000)
+            await btn.click()
+            await asyncio.sleep(2)
+            
+            await upage.wait_for_selector('.modal__inner-1[aria-label="Insert image"]', timeout=5000)
+            await asyncio.sleep(1)
+            
+            fi = await upage.wait_for_selector('.modal__inner-1[aria-label="Insert image"] input[type="file"]', timeout=5000)
+            await fi.set_input_files(abs_path)
+            await asyncio.sleep(5)
+            
+            url = await upage.evaluate("""() => {
+                var pre = document.querySelector('pre.editor__inner');
+                if (!pre) return null;
+                var imgs = pre.querySelectorAll('img');
+                for (var i = imgs.length - 1; i >= 0; i--) {
+                    if (/(?:img-blog|i-blog)\\.csdnimg\\.cn/.test(imgs[i].src))
+                        return imgs[i].src;
+                }
+                return null;
+            }""")
+            
+            if url:
+                urls_in_order.append((orig_path, url))
+                print(f"✅")
+            else:
+                print(f"⚠ No CDN URL")
+                urls_in_order.append((orig_path, None))
+        except Exception as e:
+            print(f"❌ {e}")
+            urls_in_order.append((orig_path, None))
+        finally:
+            await upage.close()
+            await ctx.close()
+        await asyncio.sleep(0.5)
+    
+    # 替换 body 中的图片路径
+    success_count = 0
+    for orig_path, url in urls_in_order:
+        if url:
+            body = body.replace(f'({orig_path})', f'({url})')
+            success_count += 1
+    
+    print(f"    ✅ {success_count}/{len(uploads)} 张图片已替换为 CDN URL")
+    
+    # 清除编辑器中的 <img> 标签残留（如果有）
     await page.evaluate("""() => {
         var pre = document.querySelector('pre.editor__inner');
         if (pre && pre.isContentEditable) {
@@ -128,47 +201,7 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
             document.execCommand('insertText', false, '');
         }
     }""")
-    
-    replacements = {}
-    for full, alt, abs_path, orig_path in uploads:
-        try:
-            btn = await page.wait_for_selector(SELECTORS["img_btn"], timeout=5000)
-            await btn.click()
-            await asyncio.sleep(1)
-            fi = await page.wait_for_selector(SELECTORS["img_input"], timeout=5000)
-            await fi.set_input_files(abs_path)
-            await asyncio.sleep(5)  # 等 CSDN 上传
-            
-            csdn_url = await page.evaluate("""() => {
-                // 优先找编辑器里最近插入的 <img> 标签（CSDN 图片域名）
-                var pre = document.querySelector('pre.editor__inner');
-                if (pre) {
-                    var imgs = pre.querySelectorAll('img');
-                    for (var i = imgs.length - 1; i >= 0; i--) {
-                        var src = imgs[i].src;
-                        if (/(?:img-blog|i-blog)\\.csdnimg\\.cn/.test(src)) return src;
-                    }
-                    // fallback: 搜 markdown 语法
-                    var text = pre.textContent || '';
-                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/(?:img-blog|i-blog)\\.csdnimg\\.cn\\/[^)]+)\\)/g);
-                    if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
-                }
-                // 旧版 CodeMirror
-                var cm = document.querySelector('.CodeMirror');
-                if (cm && cm.CodeMirror) {
-                    var text = cm.CodeMirror.getValue();
-                    var m = text.match(/!\\[.*?\\]\\((https:\\/\\/(?:img-blog|i-blog)\\.csdnimg\\.cn\\/[^)]+)\\)/g);
-                    if (m) return m[m.length-1].match(/\\(([^)]+)\\)/)[1];
-                }
-                return null;
-            }""")
-            if csdn_url:
-                replacements[orig_path] = csdn_url
-        except Exception as e:
-            print(f"  ⚠ 图片上传失败 {abs_path}: {e}")
-    
-    for old, new in replacements.items():
-        body = body.replace(f'({old})', f'({new})')
+    await asyncio.sleep(1)
     
     return body
 
@@ -296,11 +329,16 @@ async def csdn_publish(
             COOKIE_FILE.unlink(missing_ok=True)
             return "❌ 登录已过期（cookies 失效），请重新运行 csdn_login。"
 
-        # 2. 填标题
-        title_el = await page.wait_for_selector(f'xpath={SELECTORS["title"]}', timeout=10000)
-        await title_el.click()
-        await title_el.fill(title)
-        await asyncio.sleep(1)
+        # 2. 填标题（用 JS 赋值，避免 fill() 在中文长标题下失效）
+        await page.evaluate("""(t) => {
+            var inp = document.querySelector('input[placeholder*="请输入文章标题"]');
+            if (inp) {
+                inp.value = '';
+                inp.value = t;
+                inp.dispatchEvent(new Event('input', {bubbles: true}));
+                inp.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }""", title)
 
         # 3. 上传内联图片 + 注入正文
         base_dir = Path(markdown_path).parent if markdown_path else Path.cwd()
@@ -343,17 +381,30 @@ async def csdn_publish(
 
         if draft:
             try:
-                # 尝试多个选择器定位保存按钮
+                # 保存草稿：优先用工具栏保存按钮，fallback 到底部弹窗按钮
                 save_btn = None
-                for sel in [SELECTORS["save_btn_bottom"], SELECTORS["save_btn_toolbar"]]:
+                for sel in ['button.button-save', 'button.btn-save']:
                     try:
-                        save_btn = await page.wait_for_selector(sel, timeout=3000)
-                        if save_btn:
+                        sb = await page.wait_for_selector(sel, timeout=3000)
+                        if sb and await sb.is_visible():
+                            save_btn = sb
                             break
                     except:
                         continue
-                # 终极 fallback：eval 找文本含"保存"的可见按钮
-                if not save_btn:
+                
+                if save_btn:
+                    await save_btn.click()
+                    await asyncio.sleep(2)
+                    # 如果弹出 popover，点「保存草稿」
+                    try:
+                        pop = page.locator('.el-popover:visible')
+                        if await pop.count() > 0:
+                            await page.locator('button:has-text("保存草稿")').click()
+                    except:
+                        pass
+                    await asyncio.sleep(6)
+                else:
+                    # 终极 fallback：eval 找文本含"保存"的可见按钮
                     save_btn = await page.evaluate_handle('''() => {
                         const btns = document.querySelectorAll('button');
                         for (const b of btns) {
