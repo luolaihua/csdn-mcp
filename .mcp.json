@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "csdn": {
+      "type": "stdio",
+      "command": "/home/laihluo/.hermes/hermes-agent/venv/bin/python",
+      "args": [
+        "/home/laihluo/csdn-mcp/server.py"
+      ],
+      "env": {}
+    }
+  }
+}

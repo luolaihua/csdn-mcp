@@ -79,11 +79,14 @@ async def _ensure_browser():
                     # 验证 cookies 是否仍然有效
                     test_page = await _context.new_page()
                     await test_page.goto(CSDN_EDITOR, wait_until="domcontentloaded", timeout=15000)
-                    await asyncio.sleep(2)
-                    if "login" not in test_page.url and "passport" not in test_page.url:
+                    try:
+                        await test_page.wait_for_selector('input[placeholder*="请输入文章标题"]', timeout=10000)
                         _logged_in = True
+                    except:
+                        _logged_in = False
                     await test_page.close()
-            except: pass
+            except Exception as e:
+                print(f"[WARN] cookie 加载验证失败: {e}")
 
 
 def _parse_front_matter(text: str) -> dict:
@@ -145,18 +148,29 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
         upage = await ctx.new_page()
         try:
             await upage.goto(CSDN_EDITOR, wait_until="domcontentloaded", timeout=15000)
-            await asyncio.sleep(2)
-            
-            btn = await upage.wait_for_selector('button.navigation-bar__button:has-text("图片")', timeout=5000)
+
+            btn = await upage.wait_for_selector('button.navigation-bar__button:has-text("图片")', timeout=10000)
             await btn.click()
-            await asyncio.sleep(2)
-            
+
             await upage.wait_for_selector('.modal__inner-1[aria-label="Insert image"]', timeout=5000)
-            await asyncio.sleep(1)
-            
+
             fi = await upage.wait_for_selector('.modal__inner-1[aria-label="Insert image"] input[type="file"]', timeout=5000)
             await fi.set_input_files(abs_path)
-            await asyncio.sleep(5)
+
+            # 等待图片上传完成（CDN URL 出现在编辑器中）
+            try:
+                await upage.wait_for_function("""() => {
+                    var pre = document.querySelector('pre.editor__inner');
+                    if (!pre) return false;
+                    var imgs = pre.querySelectorAll('img');
+                    for (var i = imgs.length - 1; i >= 0; i--) {
+                        if (/(?:img-blog|i-blog)\\.csdnimg\\.cn/.test(imgs[i].src))
+                            return true;
+                    }
+                    return false;
+                }""", timeout=15000)
+            except Exception:
+                await asyncio.sleep(5)
             
             url = await upage.evaluate("""() => {
                 var pre = document.querySelector('pre.editor__inner');
@@ -192,17 +206,6 @@ async def _upload_inline_images(page: Page, body: str, base_dir: Path) -> str:
     
     print(f"    ✅ {success_count}/{len(uploads)} 张图片已替换为 CDN URL")
     
-    # 清除编辑器中的 <img> 标签残留（如果有）
-    await page.evaluate("""() => {
-        var pre = document.querySelector('pre.editor__inner');
-        if (pre && pre.isContentEditable) {
-            pre.focus();
-            document.execCommand('selectAll', false, null);
-            document.execCommand('insertText', false, '');
-        }
-    }""")
-    await asyncio.sleep(1)
-    
     return body
 
 
@@ -218,15 +221,16 @@ async def csdn_login() -> str:
         return "✅ 已登录 CSDN，无需重复扫码。"
 
     if _login_page:
-        try: await _login_page.close()
-        except: pass
+        try:
+            await _login_page.close()
+        except Exception as e:
+            print(f"[WARN] 关闭登录页: {e}")
 
     _login_page = await _context.new_page()
     await _login_page.goto(CSDN_LOGIN, wait_until="domcontentloaded", timeout=15000)
-    await asyncio.sleep(3)
 
     try:
-        qr_el = await _login_page.wait_for_selector(".login-code-wechat", timeout=10000)
+        qr_el = await _login_page.wait_for_selector(".login-code-wechat", timeout=15000)
         await qr_el.screenshot(path=str(QR_FILE))
     except Exception as e:
         return f"❌ 获取二维码失败: {e}"
@@ -248,7 +252,8 @@ async def csdn_confirm() -> str:
 
     try:
         current_url = _login_page.url
-    except:
+    except Exception as e:
+        print(f"[WARN] 读取登录页URL: {e}")
         _login_page = None
         return "⏳ 登录页已关闭，请重新运行 csdn_login"
 
@@ -256,7 +261,8 @@ async def csdn_confirm() -> str:
         await asyncio.sleep(1)
         try:
             current_url = _login_page.url
-        except: pass
+        except Exception as e:
+            print(f"[WARN] 二次读取登录页URL: {e}")
 
     if "passport" in current_url:
         return f"⏳ 尚未检测到登录回调，当前页面: {current_url}"
@@ -268,15 +274,32 @@ async def csdn_confirm() -> str:
         COOKIE_FILE.parent.mkdir(parents=True, exist_ok=True)
         cookies = await _context.cookies()
         COOKIE_FILE.write_text(json.dumps(cookies, indent=2, ensure_ascii=False))
-    except: pass
+    except Exception as e:
+        print(f"[WARN] 保存cookies到文件: {e}")
 
     return "✅ CSDN 登录成功！Cookies 已持久化，重启后无需重复扫码。"
 
 
 @mcp.tool
-def csdn_check_login() -> str:
+async def csdn_check_login() -> str:
     """检查当前登录状态"""
-    return "✅ 已登录 CSDN，可直接发布。" if _logged_in else "❌ 未登录，请运行 csdn_login 扫码登录。"
+    global _logged_in
+    await _ensure_browser()
+
+    try:
+        check_page = await _context.new_page()
+        await check_page.goto(CSDN_EDITOR, wait_until="domcontentloaded", timeout=15000)
+        try:
+            await check_page.wait_for_selector('input[placeholder*="请输入文章标题"]', timeout=10000)
+            _logged_in = True
+            await check_page.close()
+            return "✅ 已登录 CSDN，可直接发布。"
+        except Exception:
+            _logged_in = False
+            await check_page.close()
+            return "❌ 未登录（cookies 已过期），请运行 csdn_login 扫码登录。"
+    except Exception as e:
+        return f"❌ 检查登录状态失败: {e}"
 
 
 @mcp.tool
@@ -322,7 +345,7 @@ async def csdn_publish(
     try:
         # 1. 进入编辑器
         await page.goto(CSDN_EDITOR, wait_until="domcontentloaded", timeout=15000)
-        await asyncio.sleep(3)
+        await page.wait_for_selector('input[placeholder*="请输入文章标题"]', timeout=10000)
 
         if "login" in page.url or "passport" in page.url:
             _logged_in = False
@@ -389,20 +412,18 @@ async def csdn_publish(
                         if sb and await sb.is_visible():
                             save_btn = sb
                             break
-                    except:
+                    except Exception:
                         continue
-                
+
                 if save_btn:
                     await save_btn.click()
-                    await asyncio.sleep(2)
                     # 如果弹出 popover，点「保存草稿」
                     try:
-                        pop = page.locator('.el-popover:visible')
-                        if await pop.count() > 0:
-                            await page.locator('button:has-text("保存草稿")').click()
-                    except:
+                        draft_btn = page.locator('button:has-text("保存草稿")')
+                        if await draft_btn.is_visible(timeout=2000):
+                            await draft_btn.click()
+                    except Exception:
                         pass
-                    await asyncio.sleep(6)
                 else:
                     # 终极 fallback：eval 找文本含"保存"的可见按钮
                     save_btn = await page.evaluate_handle('''() => {
@@ -417,13 +438,18 @@ async def csdn_publish(
                     }''')
                     if not save_btn:
                         raise Exception("找不到保存按钮")
-                await save_btn.click()
-                await asyncio.sleep(5)
-                m = None
-                import re as _re
+                    await save_btn.click()
+
+                # 等待保存完成（URL 出现 articleId 或等待固定时间）
                 try:
-                    m = _re.search(r'articleId=(\d+)', page.url)
-                except: pass
+                    await page.wait_for_function(
+                        'window.location.href.includes("articleId")',
+                        timeout=10000
+                    )
+                except Exception:
+                    await asyncio.sleep(5)
+
+                m = re.search(r'articleId=(\d+)', page.url)
                 aid = m.group(1) if m else None
                 msg = f"✅ 「{title}」已保存到草稿箱"
                 if aid: msg += f"\n🔗 https://editor.csdn.net/md/?articleId={aid}"
@@ -433,12 +459,15 @@ async def csdn_publish(
             return json.dumps({"success": True, "title": title, "message": msg}, ensure_ascii=False)
 
         # ====== 发布模式 ======
-        await asyncio.sleep(2)
 
         # 打开发布弹窗
         pb = await page.wait_for_selector(f'xpath={SELECTORS["publish_btn"]}', timeout=10000)
         await pb.click()
-        await asyncio.sleep(3)
+        # 等待发布弹窗打开
+        try:
+            await page.wait_for_selector(f'xpath={SELECTORS["tag_add"]}', timeout=10000)
+        except Exception:
+            await asyncio.sleep(3)
 
         # 封面图上传（Element UI upload，需 file_chooser）
         if cover and Path(cover).exists():
@@ -450,7 +479,7 @@ async def csdn_publish(
                 await file_chooser.set_files(cover)
                 await asyncio.sleep(3)  # 等 CSDN 上传
             except Exception as e:
-                pass
+                print(f"[WARN] 封面上传: {e}")
 
         # 标签
         tag_list = [t.strip() for t in (tags or fm.get("tags","")).replace("，",",").split(",") if t.strip()]
@@ -467,7 +496,8 @@ async def csdn_publish(
                     await asyncio.sleep(0.5)
                 close_btn = await page.wait_for_selector(f'xpath={SELECTORS["tag_close"]}', timeout=5000)
                 await close_btn.click()
-            except: pass
+            except Exception as e:
+                print(f"[WARN] 添加标签失败: {e}")
 
         # 分类专栏（直接勾选可见checkbox）
         cat = category or fm.get("category", "")
@@ -477,7 +507,8 @@ async def csdn_publish(
                 cat_cb = await page.wait_for_selector(f"xpath={cat_xpath}", timeout=5000)
                 await cat_cb.click()
                 await asyncio.sleep(0.5)
-            except: pass
+            except Exception as e:
+                print(f"[WARN] 选择分类专栏失败: {e}")
 
         # 最终发布
         final = await page.wait_for_selector(f'xpath={SELECTORS["final_publish"]}', timeout=10000)
@@ -491,7 +522,8 @@ async def csdn_publish(
             current = page.url
             if "blog.csdn.net" in current and "/article/details/" in current:
                 article_url = current
-        except: pass
+        except Exception as e:
+            print(f"[WARN] 捕获策略1 URL失败: {e}")
         # 策略2: 扫描所有页面（新标签页）
         if not article_url:
             for _ in range(10):
@@ -512,7 +544,8 @@ async def csdn_publish(
                     return a ? a.href : null;
                 }""")
                 await mgmt.close()
-            except: pass
+            except Exception as e:
+                print(f"[WARN] 捕获策略3 URL失败: {e}")
 
         await page.close()
 
